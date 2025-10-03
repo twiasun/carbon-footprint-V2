@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Personal Carbon Footprint — Transport</title>
+<style>
+  :root { --ink:#0b0e12; --muted:#6b7280; --card:rgba(255,255,255,.75); }
+  html,body { height:100%; margin:0; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro","Helvetica Neue",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    color:var(--ink);
+    background: linear-gradient(160deg,#f6f7fb 0%,#eef1f8 40%,#e6ecff 100%);
+  }
+  .safe { padding: 16px 20px 120px; max-width:980px; margin:0 auto; }
+  .glass {
+    background: var(--card); border: 1px solid rgba(255,255,255,.6);
+    border-radius: 18px; box-shadow: 0 12px 40px rgba(15,17,21,.08);
+    backdrop-filter: blur(12px);
+  }
+  .h1 { font-size: 32px; font-weight: 800; }
+  .h2 { font-size: 22px; font-weight: 700; color:#2b3340; }
+  .muted { color: var(--muted); }
+  .btn { border:0; cursor:pointer; background:#0b0e12; color:#fff; border-radius:999px;
+    padding:12px 18px; font-weight:700; box-shadow:0 10px 20px rgba(11,14,18,.12); }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0; }
+  input, select { width: 220px; padding:10px 12px; border:1px solid #e8ebf0; border-radius:12px; }
+  .bubble-wrap { margin-top: 16px; display:flex; flex-wrap:wrap; gap: 18px; }
+  .bubble { width: 140px; height: 140px; border-radius:9999px;
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.08); animation: floaty 3.6s ease-in-out infinite; }
+  @keyframes floaty { 0%{transform:translateY(0)} 50%{transform:translateY(-8px)} 100%{transform:translateY(0)} }
+  .confirm-bar { position: fixed; left:0; right:0; bottom: 18px; margin: 0 auto; max-width: 920px;
+    padding: 12px 14px; display:none; align-items:center; justify-content:space-between;
+    background: rgba(255,255,255,.9); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.10); }
+  .sheet { position:fixed; left:0; right:0; bottom:0; background:#fff; transform: translateY(100%);
+    transition:.22s ease-out; border-top-left-radius:18px; border-top-right-radius:18px; }
+  .sheet.open { transform: translateY(0); }
+  .overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; }
+  .overlay.show { display:flex; }
+</style>
+</head>
+<body>
+  <div class="safe">
+    <div class="glass" style="padding:28px; margin-bottom:16px;">
+      <div class="h1">Personal Carbon Footprint</div>
+      <div class="muted">Interactive demo — Transport only</div>
+      <div style="margin-top:16px;">
+        <button class="btn" id="btnTransport">Transport</button>
+      </div>
+    </div>
+    <div class="glass" style="padding:24px;">
+      <div class="h2">Choose Your Transport</div>
+      <div class="bubble-wrap" id="bubbles"></div>
+    </div>
+  </div>
+  <div class="confirm-bar" id="confirmBar">
+    <div>Total: <span id="totalKg">0.0</span> kg/year</div>
+    <button class="btn" id="confirmBtn">Confirm</button>
+  </div>
+  <div class="sheet" id="sheet">
+    <div style="padding:12px;">
+      <div class="h2" id="sheetTitle">Transport</div>
+      <div class="row"><label>Mileage</label><input id="mileage" type="number"/></div>
+      <div class="row"><label>Unit</label><select id="unit">
+        <option value="week">km/week</option>
+        <option value="month">km/month</option>
+        <option value="year">km/year</option></select></div>
+      <div>Preview: <span id="previewKg">0.0</span> kg/year</div>
+      <button class="btn" id="saveBtn">Save</button>
+    </div>
+  </div>
+  <div class="overlay" id="overlay">
+    <div class="glass" style="padding:36px; text-align:center;">
+      <div class="h1">Your Emissions</div>
+      <div><span id="resKg">0.0</span> kg ≈ <span id="resTons">0.00</span> t/year</div>
+    </div>
+  </div>
+<script>
+(function(){
+  const FACTOR = { car:0.20, bus:0.10, metro:0.04, bike:0.00, walk:0.00, flight:0.18 };
+  const BUBBLES = [
+    { key:'car', label:'Car'}, { key:'bus', label:'Bus'}, { key:'metro', label:'Metro'},
+    { key:'bike', label:'Bike'}, { key:'walk', label:'Walk'}, { key:'flight', label:'Flight'}];
+  const bubblesEl=document.getElementById('bubbles');
+  const sheet=document.getElementById('sheet'); const mileage=document.getElementById('mileage');
+  const unit=document.getElementById('unit'); const previewKg=document.getElementById('previewKg');
+  const saveBtn=document.getElementById('saveBtn'); const confirmBar=document.getElementById('confirmBar');
+  const totalKgEl=document.getElementById('totalKg'); const confirmBtn=document.getElementById('confirmBtn');
+  const overlay=document.getElementById('overlay'); const resKg=document.getElementById('resKg'); const resTons=document.getElementById('resTons');
+  let current=null, selected={};
+  function renderBubbles(){BUBBLES.forEach(b=>{const v=document.createElement('button');v.className='bubble';v.textContent=b.label;v.onclick=()=>openSheet(b);bubblesEl.appendChild(v);});}
+  function openSheet(b){current=b; mileage.value=''; previewKg.textContent='0.0'; sheet.classList.add('open');}
+  function kmPerYear(val,p){const d=Number(val||0);if(p==='week')return d*52;if(p==='month')return d*12;return d;}
+  function updatePreview(){const k=kmPerYear(mileage.value,unit.value);const f=FACTOR[current.key];previewKg.textContent=(k*f).toFixed(1);}
+  mileage.addEventListener('input',updatePreview); unit.addEventListener('change',updatePreview);
+  saveBtn.onclick=()=>{const k=kmPerYear(mileage.value,unit.value)*FACTOR[current.key];selected[current.key]={kg:k,label:current.label};totalKgEl.textContent=k.toFixed(1);confirmBar.style.display='flex';sheet.classList.remove('open');};
+  confirmBtn.onclick=()=>{const kg=Number(totalKgEl.textContent);resKg.textContent=kg.toFixed(1);resTons.textContent=(kg/1000).toFixed(2);overlay.classList.add('show');};
+  overlay.onclick=()=>overlay.classList.remove('show');
+  renderBubbles();
+})();</script>
+</body>
+</html>
